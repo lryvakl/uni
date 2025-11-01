@@ -7,3 +7,4 @@ Includes:
 - 3 custom triggers and trigger functions
 - 5 analytical views
 - audit and soft delete logic
+Diagram - sql/db_f1_lab1.png
