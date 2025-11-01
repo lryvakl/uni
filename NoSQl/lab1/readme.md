@@ -8,4 +8,4 @@ Includes:
 - 5 analytical views
 - audit and soft delete logic
 
-/nDiagram - sql/db_f1_lab1.png
+Diagram - sql/db_f1_lab1.png
