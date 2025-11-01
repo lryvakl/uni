@@ -1,4 +1,5 @@
 # F1 Events Database
+Варіант 13: Система управління спортивними подіями
 PostgreSQL schema for Formula 1 ticketing and race management system.
 
 Includes:
