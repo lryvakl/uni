@@ -1,9 +1,107 @@
 # F1 Events Database
-PostgreSQL schema for Formula 1 ticketing and race management system.
+### Варіант 13: Система управління спортивними подіями.
 
-Includes:
-- 19 tables with relations and constraints
-- 3 stored procedures
-- 3 custom triggers and trigger functions
-- 5 analytical views
-- audit and soft delete logic
+### Детальний опис виконаної роботи:
+
+### 1–2. Схема бази даних
+
+![ER-діаграма бази даних F1 Events](sql/db_f1_lab1.png)
+
+Спроєктовано реляційну схему бази даних **F1 Events**, яка охоплює ключові процеси керування гонками Формули 1 — від створення сезонів і гран-прі до продажу квитків, управління користувачами та обліку результатів.
+
+Схема містить 19 сутностей (таблиць), що відображають основні бізнес-об’єкти системи:
+* `Seasons`, `Grand_Prix`, `Tracks`, `Sessions`
+* `Drivers`, `Constructors`, `Officials`
+* `Users`, `Roles`, `Orders`, `Order_Items`, `Tickets`
+* `Price_Tiers`, `Session_Results`, `Standings_Drivers`, `Standings_Teams` тощо
+---
+
+### 3. Підтримка "Soft Delete" та аудиту
+
+**Soft Delete:**
+* Для сутностей, дані яких мають історичну цінність (наприклад, `Users`, `Drivers`, `Tickets`), реалізовано "м’яке видалення".
+* Видалений запис не видаляється фізично, а отримує позначку:
+    * `deleted_at TIMESTAMP`
+    * `deleted_by BIGINT`
+* Механізм реалізовано через універсальний тригер:
+    * `trg_soft_delete()` — встановлює дату та користувача при видаленні.
+
+**Аудит змін:**
+* Усі зміни (INSERT / UPDATE / DELETE) у важливих таблицях фіксуються в таблиці `f1.audit_log` за допомогою тригера:
+    * `trg_audit_generic()` — автоматично записує назву таблиці, ID рядка, тип операції та користувача.
+* Поля аудиту:
+    * `created_at` – час створення запису
+    * `updated_at`, `updated_by` – час і користувач останньої зміни
+    * `deleted_at`, `deleted_by` – для soft delete
+
+---
+
+### 4. Реалізація в СУБД PostgreSQL
+Вся схема збережена у **PostgreSQL 18**.
+
+Реалізовано:
+* таблиці, послідовності (sequences), обмеження
+* зовнішні ключі (foreign keys)
+* тригерні функції та тригери
+* індекси для оптимізації запитів
+* представлення (views) для аналітичних цілей
+
+Повний DDL міститься у файлі:
+`sql/f1_schema.sql`
+
+Дані можуть бути вставлені з `sql/insert_data.sql`.
+
+---
+
+### 5. Використання об’єктів БД 
+Для реалізації бізнес-логіки на рівні бази даних створено такі об’єкти:
+
+####  Функції (3)
+* `get_app_user()` — повертає ID активного користувача для аудиту
+* `set_app_user(p_user_id)` — встановлює поточного користувача в контексті транзакції
+* `calc_points(p_position)` — обчислює очки за результатами гонки
+
+####  Тригери (3)
+* `trg_touch_row()` — автоматично оновлює `updated_at` і `updated_by`
+* `trg_soft_delete()` — реалізує логіку “м’якого видалення”
+* `trg_audit_generic()` — записує всі зміни у `audit_log`
+
+####  Збережені процедури (3)
+* `sp_sell_ticket(p_ticket_id, p_user_id)` — оформлює покупку квитка, створює замовлення та запис у `order_items`
+* `sp_cancel_order(p_order_id)` — скасовує замовлення, звільняє продані квитки
+* `sp_record_race_result(p_session_id, p_driver_id, p_constructor_id, p_position)` — додає результат гонки та оновлює таблицю `standings_drivers`
+
+####  Представлення (Views) (5)
+* `v_sessions_extended` — об’єднує інформацію про гонки, траси та дати
+* `v_dashboard_summary` — агрегує дані для аналітичної панелі (продаж квитків, дохід, статус гонок)
+* `v_driver_standings_full` — зведена таблиця результатів гонщиків
+* `v_ticket_sales` — статистика продажів квитків
+* `v_audit_recent_changes` — останні зміни в системі з іменами користувачів
+
+---
+
+### 6. Створення індексів
+Для оптимізації запитів створено:
+
+* **B-Tree індекс:**
+    * `idx_sessions_grand_prix_id` — для швидкого пошуку сесій за гран-прі
+* **Partial Index:**
+    * `idx_tickets_available` — індексує лише квитки з `is_sold = false`, щоб прискорити пошук доступних місць
+* **GIN індекс:**
+    * `idx_tracks_name_trgm` — для повнотекстового пошуку назв трас (через `pg_trgm extension`)
+
+---
+
+### 7. Робота з БД із коду (Repository + Unit of Work)
+Розроблено **Node.js-додаток (TypeScript)**, який взаємодіє з базою через патерни `Repository` та `Unit of Work`.
+
+* **Repository** — інкапсулює SQL-запити для кожної сутності (`SessionsRepository`, `TicketsRepository`, `ResultsRepository`)
+* **UnitOfWork** — координує транзакції, забезпечуючи атомарність операцій. Використовується для виконання кількох змін у рамках однієї транзакції.
+
+**Приклад:**
+Скрипт `index.ts` демонструє роботу програми:
+1.  Скидання тестових даних (`resetTestData`)
+2.  Отримання сесій через view `v_sessions_extended`
+3.  Вставка результатів гонки через процедуру `sp_record_race_result`
+4.  Продаж квитка через `sp_sell_ticket`
+5.  Завершення транзакції 
