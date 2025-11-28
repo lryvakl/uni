@@ -1576,3 +1576,16 @@ ALTER TABLE ONLY f1.user_roles
 
 \unrestrict cfMLcyNzeczMZot9ZgSuFahZJYMdd9vCFMOgx4Kwr5EcA3DgDfQDFq6G3nt0bxX
 
+
+CREATE TABLE IF NOT EXISTS lap_times (
+    id BIGSERIAL PRIMARY KEY,
+    session_id BIGINT NOT NULL, 
+    driver_id BIGINT NOT NULL, 
+    lap_number INT NOT NULL,
+    sector_1 NUMERIC(6,3),
+    sector_2 NUMERIC(6,3),
+    sector_3 NUMERIC(6,3),
+    tyre_compound TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_lap_times_search ON lap_times(session_id, driver_id);
